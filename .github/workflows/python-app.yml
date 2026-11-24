@@ -7,7 +7,6 @@ on:
     branches: [ "main" ]
 
 jobs:
-  # 1. 多版本測試 + Ruff 檢查格式化 + pytest-cov 覆蓋率
   test:
     runs-on: ubuntu-latest
     strategy:
@@ -31,9 +30,9 @@ jobs:
           pip install -r requirements.txt
 
       - name: Lint and format with Ruff
-       run: |
-         ruff format .
-         ruff check .
+        run: |
+          ruff format .
+          ruff check .
 
       - name: Test with pytest and pytest-cov
         run: |
@@ -48,7 +47,6 @@ jobs:
             test-results-${{ matrix.python-version }}.xml
             coverage-${{ matrix.python-version }}.xml
 
-  # 2. 打包 Python 發行套件 (.whl & .tar.gz) 並存為 Artifact
   build-package:
     needs: test
     runs-on: ubuntu-latest
