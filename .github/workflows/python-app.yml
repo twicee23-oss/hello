@@ -1,4 +1,4 @@
-name: Python CI Practice
+name: Build and Test Python Package
 
 on:
   push:
@@ -7,10 +7,9 @@ on:
     branches: [ "main" ]
 
 jobs:
-  build-and-test:
+  # 1. 多版本測試 + Ruff 檢查格式化 + pytest-cov 覆蓋率
+  test:
     runs-on: ubuntu-latest
-
-    # 測試多個 Python 版本 (Matrix 矩陣測試)
     strategy:
       fail-fast: false
       matrix:
@@ -20,36 +19,55 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
 
-      # 指定 Python 版本並開啟 pip 快取
       - name: Set up Python ${{ matrix.python-version }}
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
           cache: 'pip'
 
-      - name: Display Python version
-        run: python -c "import sys; print(sys.version)"
-
-      # 安裝 requirements.txt 依賴套件
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          pip install -r requirements.txt
 
-      # 程式碼風格檢查 (flake8)
-      - name: Lint with flake8
+      - name: Lint and format check with Ruff
         run: |
-          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+          ruff check .
+          ruff format --check .
 
-      # 執行單元測試並產出 XML 報告 (pytest)
-      - name: Test with pytest
+      - name: Test with pytest and pytest-cov
         run: |
-          pytest --junitxml=test-results-${{ matrix.python-version }}.xml
+          pytest --cov=. --cov-report=xml:coverage-${{ matrix.python-version }}.xml --junitxml=test-results-${{ matrix.python-version }}.xml
 
-      # 將測試報告打包上傳為 Artifact
-      - name: Upload test results artifact
+      - name: Upload test and coverage artifacts
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: test-results-${{ matrix.python-version }}
-          path: test-results-${{ matrix.python-version }}.xml
+          name: test-reports-${{ matrix.python-version }}
+          path: |
+            test-results-${{ matrix.python-version }}.xml
+            coverage-${{ matrix.python-version }}.xml
+
+  # 2. 打包 Python 發行套件 (.whl & .tar.gz) 並存為 Artifact
+  build-package:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build distribution packages
+        run: |
+          python -m pip install --upgrade pip build
+          python -m build
+
+      - name: Upload package artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-package-distributions
+          path: dist/
